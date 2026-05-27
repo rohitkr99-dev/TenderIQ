@@ -38,7 +38,13 @@ export async function POST(req: NextRequest) {
     // Log the activity
     await logActivity({
       userId: session.user.id,
-      companyId: session.user.companyId,
+      if (!session.user.companyId) {
+  return NextResponse.json(
+    { error: "Company ID missing" },
+    { status: 400 }
+  );
+}
+      
       action: "BOQ_ANALYZED",
       entityType: "BOQ",
       metadata: {
