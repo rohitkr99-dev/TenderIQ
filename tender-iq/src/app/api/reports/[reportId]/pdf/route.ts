@@ -3,35 +3,31 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ reportId: string }> }
+  context: { params: Promise<{ tenderId: string }> }
 ) {
   try {
     const params = await context.params;
-    const reportId = params.reportId;
+    const tenderId = params.tenderId;
 
-    if (!reportId) {
+    if (!tenderId) {
       return NextResponse.json(
-        { error: "Report ID is required" },
+        { error: "Tender ID is required" },
         { status: 400 }
       );
     }
 
-    const report = await prisma.report.findUnique({
+    const reports = await prisma.report.findMany({
       where: {
-        id: reportId,
+        tenderId,
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
-    if (!report) {
-      return NextResponse.json(
-        { error: "Report not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(report);
+    return NextResponse.json(reports);
   } catch (error) {
-    console.error("PDF Route Error:", error);
+    console.error("Reports Fetch Error:", error);
 
     return NextResponse.json(
       { error: "Internal Server Error" },
