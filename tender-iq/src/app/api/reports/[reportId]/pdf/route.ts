@@ -4,8 +4,9 @@ import { generateReportPDF } from '@/lib/pdf';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { reportId: string } }
+  context: { params: Promise<{ reportId: string }> }
 ) {
+  const params = await context.params;
   try {
     const { reportId } = params;
 
