@@ -1,4 +1,3 @@
-```ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
@@ -17,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { boqId } = body;
+    const boqId = body.boqId;
 
     if (!boqId) {
       return NextResponse.json(
@@ -50,11 +49,11 @@ export async function POST(req: NextRequest) {
     const totalItems = boq.items.length;
 
     const analysis =
-     "BOQ Analysis Summary\n\n" +
-     "BOQ Name: " + boq.name + "\n\n" +
-     "Tender: " + boq.tender.title + "\n\n" +
-     "Total Items: " + totalItems + "\n\n" +
-     "Total Estimated Amount: " + totalAmount + "\n\n" +
+      "BOQ Analysis Summary\n\n" +
+      "BOQ Name: " + boq.name + "\n\n" +
+      "Tender: " + boq.tender.title + "\n\n" +
+      "Total Items: " + totalItems + "\n\n" +
+      "Total Estimated Amount: " + totalAmount + "\n\n" +
       "This BOQ has been analyzed successfully.";
 
     const savedLog = await prisma.aILog.create({
@@ -62,7 +61,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         action: "BOQ_ANALYSIS",
         input: JSON.stringify({
-          boqId,
+          boqId: boqId,
         }),
         output: analysis,
       },
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      analysis,
+      analysis: analysis,
       logId: savedLog.id,
     });
   } catch (error) {
@@ -86,4 +85,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-```
