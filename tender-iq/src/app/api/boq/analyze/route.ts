@@ -1,64 +1,95 @@
-import { NextRequest, NextResponse } from "next/server"
-import axios from "axios"
-import FormData from "form-data"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { logActivity } from "@/lib/activity"
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
+import { generateChatCompletion } from "@/lib/openai";
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+
     if (!session || !session.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    const formData = await req.formData()
-    const file = formData.get("file") as File
-
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
+    if (!session.user.companyId) {
+      return NextResponse.json(
+        { error: "Company ID missing" },
+        { status: 400 }
+      );
     }
 
-    // Forward to standalone AI service
-    const aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:3001"
-    
-    const forwardData = new FormData()
-    const buffer = Buffer.from(await file.arrayBuffer())
-    forwardData.append("file", buffer, {
-      filename: file.name,
-      contentType: file.type,
-    })
+    const body = await req.json();
 
-    const response = await axios.post(`${aiServiceUrl}/api/boq/analyze`, forwardData, {
-      headers: {
-        ...forwardData.getHeaders(),
+    const { boqId, items } = body;
+
+    if (!boqId || !items || !Array.isArray(items)) {
+      return NextResponse.json(
+        { error: "Invalid request payload" },
+        { status: 400 }
+      );
+    }
+
+    const analysisPrompt = `
+Analyze the following BOQ items and provide:
+1. Cost insights
+2. Risk areas
+3. Pricing recommendations
+4. Quantity anomalies
+5. Procurement suggestions
+
+BOQ Items:
+${JSON.stringify(items.slice(0, 100), null, 2)}
+`;
+
+    const analysis = await generateChatCompletion([
+      {
+        role: "system",
+        content:
+          "You are an expert quantity surveyor and construction cost consultant.",
       },
-    })
+      {
+        role: "user",
+        content: analysisPrompt,
+      },
+    ]);
 
-    // Log the activity
+    const savedAnalysis = await prisma.analysis.create({
+      data: {
+        boqId,
+        content: analysis,
+      },
+    });
+
     await logActivity({
       userId: session.user.id,
-      if (!session.user.companyId) {
-  return NextResponse.json(
-    { error: "Company ID missing" },
-    { status: 400 }
-  );
-}
-      
+      companyId: session.user.companyId,
       action: "BOQ_ANALYZED",
       entityType: "BOQ",
       metadata: {
-        fileName: file.name,
-        itemCount: response.data.extractedData?.length || 0
-      }
+        boqId,
+        totalItems: items.length,
+      },
     });
 
-    return NextResponse.json(response.data)
+    return NextResponse.json({
+      success: true,
+      analysis: savedAnalysis,
+    });
   } catch (error: any) {
-    console.error("BOQ Analysis API Error:", error.response?.data || error.message)
+    console.error("BOQ Analysis Error:", error);
+
     return NextResponse.json(
-      { error: "Failed to analyze BOQ. Please ensure the AI service is running." },
-      { status: 500 }
-    )
+      {
+        error: "Failed to analyze BOQ",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
