@@ -21,6 +21,11 @@ export async function POST(req: Request) {
     });
 
     // Log the activity
+    if (!session.user.companyId) { 
+      return NextResponse.json( 
+        { error: "Company ID missing" }, 
+        { status: 400 } ); }
+    
     await logActivity({
       userId: session.user.id,
       companyId: session.user.companyId,
