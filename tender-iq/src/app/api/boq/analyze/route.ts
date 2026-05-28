@@ -50,18 +50,16 @@ export async function POST(req: NextRequest) {
 
     const totalItems = boq.items.length;
 
-    const analysis = `
-BOQ Analysis Summary
+    ```ts id="pkmy4s"
+const analysis =
+  "BOQ Analysis Summary\n\n" +
+  `BOQ Name: ${boq.name}\n\n` +
+  `Tender: ${boq.tender.title}\n\n` +
+  `Total Items: ${totalItems}\n\n` +
+  `Total Estimated Amount: ${totalAmount}\n\n` +
+  "This BOQ has been analyzed successfully.";
+```
 
-BOQ Name: ${boq.name}
-
-Tender: ${boq.tender.title}
-
-Total Items: ${totalItems}
-
-Total Estimated Amount: ${totalAmount}
-
-This BOQ has been analyzed successfully.
     `.trim();
 
     const savedLog = await prisma.aILog.create({
