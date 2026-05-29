@@ -10,7 +10,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -18,8 +19,12 @@ export async function GET(
 
     const quotations = await prisma.quotation.findMany({
       where: { tenderId },
-      include: { vendor: true },
-      orderBy: { totalAmount: "asc" },
+      include: {
+        vendor: true,
+      },
+      orderBy: {
+        totalAmount: "asc",
+      },
     });
 
     return NextResponse.json(quotations);
@@ -35,12 +40,23 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const companyId = session.user.companyId;
+
+    if (!companyId) {
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
     }
 
     const { tenderId } = await params;
     const body = await req.json();
+
     const {
       vendorId,
       totalAmount,
@@ -53,7 +69,10 @@ export async function POST(
     } = body;
 
     if (!vendorId || !totalAmount) {
-      return new NextResponse("Missing required fields", { status: 400 });
+      return new NextResponse(
+        "Missing required fields",
+        { status: 400 }
+      );
     }
 
     const quotation = await prisma.quotation.create({
@@ -70,14 +89,13 @@ export async function POST(
       },
       include: {
         vendor: true,
-        tender: true
-      }
+        tender: true,
+      },
     });
 
-    // Log the activity
     await logActivity({
       userId: session.user.id,
-      companyId: session.user.companyId,
+      companyId,
       action: "QUOTATION_SUBMITTED",
       entityId: quotation.id,
       entityType: "QUOTATION",
@@ -85,8 +103,8 @@ export async function POST(
         vendorName: quotation.vendor.name,
         tenderTitle: quotation.tender.title,
         amount: quotation.totalAmount,
-        currency: quotation.currency
-      }
+        currency: quotation.currency,
+      },
     });
 
     return NextResponse.json(quotation);
