@@ -8,14 +8,17 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
     const companyId = session.user.companyId;
 
     if (!companyId) {
-      return new NextResponse("User not associated with a company", { status: 400 });
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
     }
 
     const members = await prisma.user.findMany({
@@ -42,34 +45,49 @@ export async function GET(req: Request) {
   }
 }
 
-  export async function PATCH(req: Request) {
+export async function PATCH(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
     const { userId, role } = await req.json();
 
     if (!userId || !role) {
-      return new NextResponse("Missing userId or role", { status: 400 });
+      return new NextResponse(
+        "Missing userId or role",
+        { status: 400 }
+      );
     }
 
     const userRole = session.user.role;
     const companyId = session.user.companyId;
 
-    if (userRole !== "ADMIN") {
-      return new NextResponse("Forbidden: Only ADMIN can change roles", { status: 403 });
+    if (!companyId) {
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
     }
 
-    // Check if member is in the same company
+    if (userRole !== "ADMIN") {
+      return new NextResponse(
+        "Forbidden: Only ADMIN can change roles",
+        { status: 403 }
+      );
+    }
+
     const member = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!member || member.companyId !== companyId) {
-      return new NextResponse("User not found in your company", { status: 404 });
+      return new NextResponse(
+        "User not found in your company",
+        { status: 404 }
+      );
     }
 
     const updatedUser = await prisma.user.update({
@@ -83,7 +101,10 @@ export async function GET(req: Request) {
       action: "ROLE_UPDATED",
       entityId: userId,
       entityType: "User",
-      metadata: { targetUserId: userId, newRole: role },
+      metadata: {
+        targetUserId: userId,
+        newRole: role,
+      },
     });
 
     return NextResponse.json(updatedUser);
@@ -97,7 +118,7 @@ export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -111,26 +132,44 @@ export async function DELETE(req: Request) {
     const userRole = session.user.role;
     const companyId = session.user.companyId;
 
+    if (!companyId) {
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
+    }
+
     if (userRole !== "ADMIN") {
-      return new NextResponse("Forbidden: Only ADMIN can remove members", { status: 403 });
+      return new NextResponse(
+        "Forbidden: Only ADMIN can remove members",
+        { status: 403 }
+      );
     }
 
     if (userId === session.user.id) {
-      return new NextResponse("Cannot remove yourself", { status: 400 });
+      return new NextResponse(
+        "Cannot remove yourself",
+        { status: 400 }
+      );
     }
 
-    // Check if member is in the same company
     const member = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!member || member.companyId !== companyId) {
-      return new NextResponse("User not found in your company", { status: 404 });
+      return new NextResponse(
+        "User not found in your company",
+        { status: 404 }
+      );
     }
 
     await prisma.user.update({
       where: { id: userId },
-      data: { companyId: null, role: "USER" }, // Remove from company, reset role
+      data: {
+        companyId: null,
+        role: "USER",
+      },
     });
 
     await logActivity({
@@ -139,10 +178,15 @@ export async function DELETE(req: Request) {
       action: "MEMBER_REMOVED",
       entityId: userId,
       entityType: "User",
-      metadata: { removedUserId: userId },
+      metadata: {
+        removedUserId: userId,
+      },
     });
 
-    return new NextResponse("Member removed", { status: 200 });
+    return new NextResponse(
+      "Member removed",
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Remove member error:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
