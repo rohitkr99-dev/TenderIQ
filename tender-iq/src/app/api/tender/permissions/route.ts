@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -58,18 +58,29 @@ export async function POST(req: Request) {
     const userRole = session.user.role;
     const companyId = session.user.companyId;
 
+    if (!companyId) {
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
+    }
+
     if (userRole !== "ADMIN" && userRole !== "MANAGER") {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    // Verify tender belongs to company
     const tender = await prisma.tender.findUnique({
       where: { id: tenderId },
-      include: { project: true },
+      include: {
+        project: true,
+      },
     });
 
     if (!tender || tender.project.companyId !== companyId) {
-      return new NextResponse("Tender not found in your company", { status: 404 });
+      return new NextResponse(
+        "Tender not found in your company",
+        { status: 404 }
+      );
     }
 
     const permission = await prisma.tenderPermission.upsert({
@@ -95,7 +106,10 @@ export async function POST(req: Request) {
       action: "TENDER_PERMISSION_UPDATED",
       entityId: tenderId,
       entityType: "Tender",
-      metadata: { targetUserId: userId, newRole: role },
+      metadata: {
+        targetUserId: userId,
+        newRole: role,
+      },
     });
 
     return NextResponse.json(permission);
@@ -109,7 +123,7 @@ export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -123,6 +137,13 @@ export async function DELETE(req: Request) {
 
     const userRole = session.user.role;
     const companyId = session.user.companyId;
+
+    if (!companyId) {
+      return new NextResponse(
+        "User not associated with a company",
+        { status: 400 }
+      );
+    }
 
     if (userRole !== "ADMIN" && userRole !== "MANAGER") {
       return new NextResponse("Forbidden", { status: 403 });
@@ -143,7 +164,9 @@ export async function DELETE(req: Request) {
       action: "TENDER_PERMISSION_REMOVED",
       entityId: tenderId,
       entityType: "Tender",
-      metadata: { targetUserId: userId },
+      metadata: {
+        targetUserId: userId,
+      },
     });
 
     return new NextResponse("Permission removed", { status: 200 });
